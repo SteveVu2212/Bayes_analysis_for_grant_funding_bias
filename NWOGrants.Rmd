@@ -1,6 +1,6 @@
 ---
 title: "NWOGrants"
-output: html_document
+output: github_document
 ---
 
 # Installation
@@ -72,7 +72,7 @@ dat <- list(
 
 
 ```{r}
-m1 <- cmdstan_model("m1.stan")
+m1 <- cmdstan_model("stancode/m1.stan")
 fit1 <- m1$sample(data=dat, chains=4, parallel_chains=getOption("mc.core",4))
 summary1 <- as.data.frame(fit1$summary(c("a")))
 summary1
@@ -120,7 +120,7 @@ $$
 ### Model fitting
 
 ```{r}
-m2 <- cmdstan_model("m2.stan")
+m2 <- cmdstan_model("stancode/m2.stan")
 fit2 <- m2$sample(data=dat, chains=4, parallel_chains=getOption("mc.core",4))
 summary2 <- as.data.frame(fit2$summary(c("a")))
 summary2
@@ -220,7 +220,7 @@ $$
 ### Model fitting
 
 ```{r}
-m3 <- cmdstan_model('m3.stan')
+m3 <- cmdstan_model('stancode/m3.stan')
 fit3 <- m3$sample(data=dat, chains=4, parallel_chains=getOption('mc.core',4))
 summary3 <- as.data.frame(fit3$summary(c("a", "a_bar", "sigma")))
 summary3
