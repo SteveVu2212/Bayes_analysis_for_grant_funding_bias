@@ -1,0 +1,410 @@
+---
+title: "NWOGrants"
+output: html_document
+---
+
+# Installation
+
+```{r}
+library(rethinking)
+library(cmdstanr)
+library(bayesplot)
+library(posterior)
+library(dagitty)
+library(loo)
+```
+
+# Data story
+
+In 2015, Romy van der Kee and Naomi Ellemers published a study about discrimination in the grant funding in the Netherlands. The authors collected 2,823 cases of prestigious grant for personal research funding among 9 disciplines. Their research finding is that gender bias favoring male applicants over female applicants in the prioritization of their quality researcher evaluation and success rates. The project will revisit that study under Bayesian perspective
+
+```{r}
+data("NWOGrants")
+d1 <- NWOGrants
+str(d1)
+```
+
+# Heuristic causal model (DAG)
+
+The DAG below graphically draws the research question of whether there exists gender discrimination in grant funding in the Netherlands. While we are most concerned about the direct effect of gender (G) onto awards (A), it is possible to see a mediator of discipline (D) that exaggerates the impact of gender. Furthermore, there likely exists an unobserved variable such as the research quality that affects both D and A. Such a variable or any other possible proxies were not present in the data set. It can limit our conclusion about the causal effect of G on A
+
+```{r}
+dag1 <- dagitty("dag{G->A
+                  G->D->A
+                  D<-U->A}")
+coordinates(dag1) <- list(x=c(G=0,D=1,A=2,U=2),y=c(G=0,D=-1,A=0,U=-1))
+drawdag(dag1)
+```
+
+# Total effect of gender on grant awards
+## Scientific model
+
+At the beginning, we will focus on the total effect of gender on grant awards. That is represented by two causal path, G->A and G->D->A. I avoid using the term "indirect causal effect" here. We can find more information about it in Chapter 9 in Pearl et al. (2018). Given a observational data set, we are going to use an aggregated binomial regression for the problem. Here A indicates the awards, N is the number of applications, and p is the probability of receiving grant. We denote a as the parameter that needs being assigned a prior
+
+$$
+A \sim Bin(N,p)\\
+logit(p) = a_{G}\\
+a \sim tbd
+$$
+### Define priors
+
+Apparently, the below figure shows a transition from a basic space to a logit space in which a flat Normal(0,10) prior produces a very non-flat prior distribution on the outcome space. The second prior, Normal(0,1.5), produces a more reasonable outcome
+
+```{r}
+plot(NULL, xlab="alpha", ylab="density",
+     xlim = c(0,1), ylim=c(0,5))
+dens(inv_logit(rnorm(n=1e4,mean=0,sd=1.5)), lwd=4, col=2, add=T)
+text(x=0.2,y=0.7, "alpha ~ N(0,1.5)", col=2, font=2)
+dens(inv_logit(rnorm(n=1e4,mean=0,sd=10)), lwd=4, col=4, add=T)
+text(x=0.2,y=2.0, "alpha ~ N(0,10)", col=4, font=2)
+```
+
+### Model fitting
+
+```{r}
+dat <- list(
+  N = d1$applications,
+  A = d1$awards,
+  G = ifelse(d1$gender=='f',1,2),
+  D = as.integer(d1$discipline)
+)
+```
+
+
+```{r}
+m1 <- cmdstan_model("m1.stan")
+fit1 <- m1$sample(data=dat, chains=4, parallel_chains=getOption("mc.core",4))
+summary1 <- as.data.frame(fit1$summary(c("a")))
+summary1
+```
+
+```{r}
+draws1 <- fit1$draws()
+```
+
+### Model dianosing
+
+The Markov Chain Monte Carlo (MCMC) sampling performs properly as all four chains mix together. The number of efficient samples and rhat indicator show no potential warnings. We can move forward onto the inference step
+
+```{r, fig.height=3, fig.width=10}
+bayesplot::mcmc_trace(draws1, regex_pars = c('a'))
+```
+
+### Model sampling
+
+Sampling from the Bayesian model above, we focus on the gender contrast on probability scale. The point is that female scholars seem to be less advantaged than their male counterparts. The quantitative bias is almost 3%. The is a critical number as the success rate of a grant is only around 20%. However, as we discussed before, that bias covers a total effect of gender on awards. We must know the direct effect of gender on awards before making any conclusions about gender discrimination
+
+```{r}
+x1 = inv_logit(extract_variable(draws1, variable = sprintf("a[1]")))
+x2 = inv_logit(extract_variable(draws1, variable = sprintf("a[2]")))
+diff_prob_G1 <- x1 - x2
+```
+
+
+```{r}
+dens(diff_prob_G1, lwd=2, col=2, xlab="Gender contrast (probability)", ylab="Density")
+abline(v=0,lty=3)
+```
+
+# Direct effect of gender on grant awards
+## No-pooling statistical models
+
+We are considering a base case without an unobserved variable. So, to measure the direct effect of gender on grant awards, we need to separate it from the total effect and close the path going through the discipline by conditioning on D. Statistically, we need to add D into the model. By combining G and D, the parameter, a, will be a matrix with shape of 2 genders and 9 disciplines
+
+$$
+A \sim Bin(N,p)\\
+logit(p) = a_{G,D}\\
+a \sim N(0,1.5)
+$$
+
+### Model fitting
+
+```{r}
+m2 <- cmdstan_model("m2.stan")
+fit2 <- m2$sample(data=dat, chains=4, parallel_chains=getOption("mc.core",4))
+summary2 <- as.data.frame(fit2$summary(c("a")))
+summary2
+```
+
+
+```{r}
+draws2 <- fit2$draws()
+```
+
+### Model dianosing
+
+There are no clear clues regarding of issues in the sampling process. We can safely move forward
+
+```{r, fig.height=10, fig.width=10}
+bayesplot:: mcmc_trace(draws2, regex_pars = c("a"))
+```
+
+
+### Model sampling
+
+Different to the first contrast figure, adding D into the model actually reveals the hidden discrepancies among grant awards in each disciplines. Female scholars are expected to have higher success rates in disciplines of humanities, interdisciplinary, technical sciences. Male scholars are positive about Earth/life sciences, Medical sciences, and Social sciences
+
+```{r}
+diff_prob_G2 <- matrix(0,nrow=4000,ncol=9)
+for(i in 1:9){
+  x1 = inv_logit(extract_variable(draws2, variable = sprintf("a[1,%d]",i)))
+  x2 = inv_logit(extract_variable(draws2, variable = sprintf("a[2,%d]",i)))
+  diff_prob_G2[,i] = x1 - x2
+}
+```
+
+
+```{r, fig.width=10, fig.height=6}
+plot(NULL, xlim=c(-0.2,0.3), ylim=c(0,20), xlab="Gender contrast (probability)", ylab="Density")
+disc <- as.character(d1$discipline)
+disc <- disc[order(dat$D)]
+for(i in 1:9){
+  dens(diff_prob_G2[,i], lwd=2, col=i, add=T)
+  xloc <- ifelse(mean(diff_prob_G2[,i]) < 0, -0.2, 0.2)
+  xpos <- ifelse(mean(diff_prob_G2[,i]) < 0, 4, 2)
+  text(xloc - 0.5*mean(diff_prob_G2[,i]), 18-i, disc[2*i], col=i, pos=xpos, font=2)
+  abline(v=0,lty=3)
+}
+```
+
+In addition to the contrast figure, we want to compare our model's posterior prediction with the input data. There are a large room to improve the performance of the model as seen in the figure below. The filled red and blue points represent for the empirical success rates of females and males, respectively. Obviously, females are favored over males in some disciplines, vice versa. However, we can clearly see that the current posterior prediction is largely variant in compared with the input data. For example, the discipline #7 experiences a wide range of 89% percentile intervals
+
+To cure the issue, we are going to build a hierarchical or partial pooling model that is expected to allows our model learning across observations
+
+```{r}
+dat_sim <- list(gid = rep(1:2, times=9), disc_id = dat$D)
+admit_post2 <- matrix(0, nrow=4000, ncol=18)
+for(i in 1:18){
+  admit_post2[,i] = inv_logit(extract_variable(draws2, sprintf("a[%d,%d]",dat_sim$gid[i],dat_sim$disc_id[i])))
+}
+```
+
+
+```{r}
+admit_mu2 <- apply(admit_post2, 2, mean)
+admit_pi2 <- apply(admit_post2, 2,PI, prob=0.89)
+```
+
+
+```{r, fig.width=10, fig.height=6}
+plot(NULL, xlim=c(1,18),ylim=c(0,0.6),
+     xlab="discipline and gender", ylab="probability", xaxt="n", yaxt="n")
+axis(side=2,at=seq(0,0.6,by=0.2), labels=c(0.0,0.2,0.4,0.6))
+axis(side=1,at=seq(1,18,by=1), labels=seq(1,18,by=1))
+
+points(x=1:18, y=admit_mu2, pch=10)
+for(i in 1:18){points(x=rep(i,2), y=admit_pi2[,i], pch=3)}
+
+for(i in 1:18){
+  points(x=i, y=dat$A[i]/dat$N[i], pch=19, col=ifelse(i%%2 == 0,4,2))
+}
+
+for(i in 1:9){lines(x=c(2*i-1,2*i),y=c(dat$A[2*i-1]/dat$N[2*i-1],dat$A[2*i]/dat$N[2*i]))}
+for(i in 1:9){text(x=2*i-0.5,y=mean(c(dat$A[2*i-1]/dat$N[2*i-1],dat$A[2*i]/dat$N[2*i]))+0.2,
+                   labels = concat("disc ",dat$D[2*i]), font=1)}
+```
+
+## Partial pooling statistical model
+
+In the model, we introduce three additional variables of a_bar and sigma. Intuitively, the preceding model implies an infinite variance among the a parameters. Here, the parameter shares a common distribution constructed by the three new parameters which are estimated from the data. Another noteworthy point is that we are using a non-centered parameterization to improve the sampling process of the MCMC
+
+$$
+A \sim Bin(N,p)\\
+logit(p) = a_{G,D}\\
+a = \bar{a} + z*\sigma\\
+\bar{a} \sim N(0,1.5)\\
+\sigma \sim Exp(1.5)\\
+z \sim N(0,1)
+$$
+
+### Model fitting
+
+```{r}
+m3 <- cmdstan_model('m3.stan')
+fit3 <- m3$sample(data=dat, chains=4, parallel_chains=getOption('mc.core',4))
+summary3 <- as.data.frame(fit3$summary(c("a", "a_bar", "sigma")))
+summary3
+```
+
+```{r}
+draws3 <- fit3$draws()
+```
+
+### Model diagnosing
+
+The mixing is appropriate although there are some divergence in the sampling process. We will see the k value in pareto-smoothed importance sampling cross-validation (PSIS) later
+
+```{r, fig.height=10, fig.width=10}
+bayesplot::mcmc_trace(draws3, regex_pars = c("a"))
+```
+
+### Model sampling
+
+In comparison with the previous gender contrast figure, the most important change is that the estimated distributions of disciplines move closer to zero. That comes from the power of a hierarchical model which extracts cross-sample information during its sampling process
+
+```{r}
+diff_prob_G3 <- matrix(0,nrow=4000,ncol=9)
+for(i in 1:9){
+  x1 = inv_logit(extract_variable(draws3, variable = sprintf("a[1,%d]",i)))
+  x2 = inv_logit(extract_variable(draws3, variable = sprintf("a[2,%d]",i)))
+  diff_prob_G3[,i] = x1 - x2
+}
+```
+
+
+```{r, fig.width=10, fig.height=6}
+plot(NULL, xlim=c(-0.2,0.3), ylim=c(0,20), xlab="Gender contrast (probability)", ylab="Density")
+disc <- as.character(d1$discipline)
+disc <- disc[order(dat$D)]
+for(i in 1:9){
+  dens(diff_prob_G3[,i], lwd=2, col=i, add=T)
+  xloc <- ifelse(mean(diff_prob_G3[,i]) < 0, -0.2, 0.2)
+  xpos <- ifelse(mean(diff_prob_G3[,i]) < 0, 4, 2)
+  text(xloc - 0.5*mean(diff_prob_G3[,i]), 18-i, disc[2*i], col=i, pos=xpos, font=2)
+  abline(v=0,lty=3)
+}
+```
+
+One more step, we can see that our estimates have improved much better and the percentile intervals have been shortened significantly. The success rates tend to converge into the global mean around 20%
+
+```{r}
+dat_sim <- list(gid = rep(1:2, times=9), disc_id = dat$D)
+admit_post3 <- matrix(0, nrow=4000, ncol=18)
+for(i in 1:18){
+  admit_post3[,i] = inv_logit(extract_variable(draws3, sprintf("a[%d,%d]",dat_sim$gid[i],dat_sim$disc_id[i])))
+}
+```
+
+
+```{r}
+admit_mu3 <- apply(admit_post3, 2, mean)
+admit_pi3 <- apply(admit_post3, 2,PI, prob=0.89)
+```
+
+
+```{r, fig.width=10, fig.height=6}
+plot(NULL, xlim=c(1,18),ylim=c(0,0.6),
+     xlab="discipline and gender", ylab="probability", xaxt="n", yaxt="n")
+axis(side=2,at=seq(0,0.6,by=0.2), labels=c(0.0,0.2,0.4,0.6))
+axis(side=1,at=seq(1,18,by=1), labels=seq(1,18,by=1))
+
+points(x=1:18, y=admit_mu3, pch=10)
+for(i in 1:18){points(x=rep(i,2), y=admit_pi3[,i], pch=3)}
+
+for(i in 1:18){
+  points(x=i, y=dat$A[i]/dat$N[i], pch=19, col=ifelse(i%%2 == 0,4,2))
+}
+
+for(i in 1:9){lines(x=c(2*i-1,2*i),y=c(dat$A[2*i-1]/dat$N[2*i-1],dat$A[2*i]/dat$N[2*i]))}
+
+for(i in 1:9){text(x=2*i-0.5,y=mean(c(dat$A[2*i-1]/dat$N[2*i-1],dat$A[2*i]/dat$N[2*i]))+0.2,
+                   labels = concat("disc ",dat$D[2*i]), font=1)}
+```
+
+# Model comparison
+
+By using PSIS as a comparing criteria, we see that the third model, a hierarchical model, has a higher posterior predictive accuracy than the other two. There are warnings of some high Pareto k values. Those are insignificant here. We will move on and evaluate the causal effect of gender onto awards by using the sampling from the third model
+
+```{r}
+loo1 <- fit1$loo()
+loo2 <- fit2$loo()
+loo3 <- fit3$loo()
+```
+
+
+```{r}
+loo_compare(loo1, loo2, loo3)
+```
+
+# Causal effects
+
+Previously, we see the discrepancies of grant funding rates among disciplines. To make a conclusions about the potential gender discrimination, we need to calculate the average causal effects based on the observational data
+
+## Stratification
+
+The first method is to weight the posterior prediction of direct effects of gender onto each disciplines in proportion to the number of applications in the sample. The below figure's mean is slightly negative, which implies a potential discrimination. Because of the tiny value, we need to do two extra things, 1) collecting more data to confirm the gender gap, 2) finding a way to proxy the unobserved variable. In the opening DAG, the unobserved variable is a confounder of D and A. By conditioning on D, we unintentionally open a backdoor path between G and A
+
+```{r}
+male_app <- d1$applications[d1$gender == 'm']
+female_app <- d1$applications[d1$gender == 'f']
+male_prop <- male_app / sum(male_app)
+female_prop <- female_app / sum(female_app)
+```
+
+```{r}
+female_prob <- matrix(0,nrow=4000,ncol=9)
+male_prob <- matrix(0,nrow=4000,ncol=9)
+for(i in 1:9){
+  female_prob[,i] = inv_logit(extract_variable(draws3, variable = sprintf("a[1,%d]",i)))
+  male_prob[,i] = inv_logit(extract_variable(draws3, variable = sprintf("a[2,%d]",i)))
+}
+```
+
+
+```{r}
+female_avg <- female_prob %*% female_prop
+male_avg <- male_prob %*% male_prop
+```
+
+
+```{r}
+dens( female_avg - male_avg , lwd=4 , col=2 , xlab="effect of gender" )
+abline(v=0,lty=3)
+```
+
+## Creating a pseudo-population
+
+The second method is to do an intervation by creating a pseudo-population. We are going to generate a simulation that in each stratum of discipline every applicants have the same gender status. In the lecture of Stat rethinking 2022, Richard referred it to an artificial variable of gender perception that lies in the direct causal path between G and A, and has no connection with D
+
+The diagram shares a similar conclusion with the preceding one as the contrast distribution's mean is slightly negative
+
+```{r}
+total_apps <- sum(dat$N)
+apps_per_disc <- sapply(1:9, function(i){
+  sum(dat$N[dat$D == i])
+})
+```
+
+
+```{r}
+# simulate as if all apps from women
+dat_sim1 <- list(
+    D=rep(1:9,times=apps_per_disc),
+    N=rep(1,total_apps),
+    G=rep(1,total_apps))
+```
+
+
+```{r}
+# simulate as if all apps from men
+dat_sim2 <- list(
+    D=rep(1:9,times=apps_per_disc),
+    N=rep(1,total_apps),
+    G=rep(2,total_apps))
+```
+
+
+```{r}
+p_g1 <- matrix(0,nrow=4000,ncol=total_apps)
+p_g2 <- matrix(0,nrow=4000,ncol=total_apps)
+for(i in 1:total_apps){
+  p_g1[,i] = inv_logit(extract_variable(draws3, variable = sprintf("a[1,%d]",dat_sim1$D[i])))
+  p_g2[,i] = inv_logit(extract_variable(draws3, variable = sprintf("a[2,%d]",dat_sim2$D[i])))
+}
+```
+
+
+```{r}
+dens( p_g1 - p_g2 , lwd=4 , col=2 , xlab="effect of gender perception" )
+abline(v=0,lty=3)
+```
+
+
+# References
+
+Van der Lee, R., & Ellemers, N. (2015). Gender contributes to personal research funding success in The Netherlands. Proceedings of the National Academy of Sciences, 112(40), 12349-12353.
+
+McElreath, R. (2020). Statistical rethinking: A Bayesian course with examples in R and Stan. Chapman and Hall/CRC.
+
+Pearl, J., & Mackenzie, D. (2018). The book of why: the new science of cause and effect. Basic books.
+
