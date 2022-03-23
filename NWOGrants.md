@@ -4,101 +4,17 @@ NWOGrants
 # Installation
 
 ``` r
+rm(list=ls())
+```
+
+``` r
 library(rethinking)
-```
-
-    ## Loading required package: rstan
-
-    ## Loading required package: StanHeaders
-
-    ## Loading required package: ggplot2
-
-    ## rstan (Version 2.21.3, GitRev: 2e1f913d3ca3)
-
-    ## For execution on a local, multicore CPU with excess RAM we recommend calling
-    ## options(mc.cores = parallel::detectCores()).
-    ## To avoid recompilation of unchanged Stan programs, we recommend calling
-    ## rstan_options(auto_write = TRUE)
-
-    ## Loading required package: parallel
-
-    ## rethinking (Version 2.13)
-
-    ## 
-    ## Attaching package: 'rethinking'
-
-    ## The following object is masked from 'package:stats':
-    ## 
-    ##     rstudent
-
-``` r
 library(cmdstanr)
-```
-
-    ## This is cmdstanr version 0.4.0
-
-    ## - Online documentation and vignettes at mc-stan.org/cmdstanr
-
-    ## - CmdStan path set to: /Users/mac/.cmdstanr/cmdstan-2.29.1
-
-    ## - Use set_cmdstan_path() to change the path
-
-``` r
 library(bayesplot)
-```
-
-    ## This is bayesplot version 1.8.1
-
-    ## - Online documentation and vignettes at mc-stan.org/bayesplot
-
-    ## - bayesplot theme set to bayesplot::theme_default()
-
-    ##    * Does _not_ affect other ggplot2 plots
-
-    ##    * See ?bayesplot_theme_set for details on theme setting
-
-``` r
 library(posterior)
-```
-
-    ## This is posterior version 1.2.0
-
-    ## 
-    ## Attaching package: 'posterior'
-
-    ## The following object is masked from 'package:bayesplot':
-    ## 
-    ##     rhat
-
-    ## The following objects are masked from 'package:rstan':
-    ## 
-    ##     ess_bulk, ess_tail
-
-    ## The following objects are masked from 'package:stats':
-    ## 
-    ##     mad, sd, var
-
-``` r
 library(dagitty)
 library(loo)
 ```
-
-    ## This is loo version 2.4.1
-
-    ## - Online documentation and vignettes at mc-stan.org/loo
-
-    ## - As of v2.0.0 loo defaults to 1 core but we recommend using as many as possible. Use the 'cores' argument or set options(mc.cores = NUM_CORES) for an entire session.
-
-    ## 
-    ## Attaching package: 'loo'
-
-    ## The following object is masked from 'package:rethinking':
-    ## 
-    ##     compare
-
-    ## The following object is masked from 'package:rstan':
-    ## 
-    ##     loo
 
 # Data story
 
@@ -141,7 +57,7 @@ coordinates(dag1) <- list(x=c(G=0,D=1,A=2,U=2),y=c(G=0,D=-1,A=0,U=-1))
 drawdag(dag1)
 ```
 
-![](NWOGrants_files/figure-gfm/unnamed-chunk-3-1.png)<!-- -->
+![](NWOGrants_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
 
 # Total effect of gender on grant awards
 
@@ -156,11 +72,8 @@ regression for the problem. Here A indicates the awards, N is the number
 of applications, and p is the probability of receiving grant. We denote
 a as the parameter that needs being assigned a prior
 
-$$
-A \\sim Bin(N,p)\\\\
-logit(p) = a\_{G}\\\\
-a \\sim tbd
-$$
+![](https://github.com/SteveVu2212/Bayes_analysis_for_grant_funding_bias/blob/main/pictures/model_1.png)
+
 ### Define priors
 
 Apparently, the below figure shows a transition from a basic space to a
@@ -177,7 +90,7 @@ dens(inv_logit(rnorm(n=1e4,mean=0,sd=10)), lwd=4, col=4, add=T)
 text(x=0.2,y=2.0, "alpha ~ N(0,10)", col=4, font=2)
 ```
 
-![](NWOGrants_files/figure-gfm/unnamed-chunk-4-1.png)<!-- -->
+![](NWOGrants_files/figure-gfm/unnamed-chunk-5-1.png)<!-- -->
 
 ### Model fitting
 
@@ -300,11 +213,11 @@ summary1
 ```
 
     ##   variable      mean    median         sd        mad        q5       q95
-    ## 1     a[1] -1.740487 -1.739325 0.08071646 0.08209897 -1.874980 -1.610673
-    ## 2     a[2] -1.533962 -1.531710 0.06387216 0.06256572 -1.640843 -1.431786
+    ## 1     a[1] -1.738504 -1.739265 0.08128572 0.08173574 -1.873004 -1.605542
+    ## 2     a[2] -1.533669 -1.532615 0.06551546 0.06435225 -1.642110 -1.426193
     ##       rhat ess_bulk ess_tail
-    ## 1 1.000782 3761.436 2786.949
-    ## 2 1.000290 3956.413 2786.528
+    ## 1 1.000546 3252.583 2572.181
+    ## 2 1.000828 3965.145 2796.203
 
 ``` r
 draws1 <- fit1$draws()
@@ -321,7 +234,7 @@ inference step
 bayesplot::mcmc_trace(draws1, regex_pars = c('a'))
 ```
 
-![](NWOGrants_files/figure-gfm/unnamed-chunk-8-1.png)<!-- -->
+![](NWOGrants_files/figure-gfm/unnamed-chunk-9-1.png)<!-- -->
 
 ### Model sampling
 
@@ -344,7 +257,7 @@ dens(diff_prob_G1, lwd=2, col=2, xlab="Gender contrast (probability)", ylab="Den
 abline(v=0,lty=3)
 ```
 
-![](NWOGrants_files/figure-gfm/unnamed-chunk-10-1.png)<!-- -->
+![](NWOGrants_files/figure-gfm/unnamed-chunk-11-1.png)<!-- -->
 
 # Direct effect of gender on grant awards
 
@@ -357,11 +270,7 @@ by conditioning on D. Statistically, we need to add D into the model. By
 combining G and D, the parameter, a, will be a matrix with shape of 2
 genders and 9 disciplines
 
-$$
-A \\sim Bin(N,p)\\\\
-logit(p) = a\_{G,D}\\\\
-a \\sim N(0,1.5)
-$$
+![](https://github.com/SteveVu2212/Bayes_analysis_for_grant_funding_bias/blob/main/pictures/model_2.png)
 
 ### Model fitting
 
@@ -386,6 +295,13 @@ fit2 <- m2$sample(data=dat, chains=4, parallel_chains=getOption("mc.core",4))
     ## Chain 1 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
     ## Chain 1 Iteration: 1100 / 2000 [ 55%]  (Sampling) 
     ## Chain 1 Iteration: 1200 / 2000 [ 60%]  (Sampling) 
+    ## Chain 1 Iteration: 1300 / 2000 [ 65%]  (Sampling) 
+    ## Chain 1 Iteration: 1400 / 2000 [ 70%]  (Sampling) 
+    ## Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+    ## Chain 1 Iteration: 1600 / 2000 [ 80%]  (Sampling) 
+    ## Chain 1 Iteration: 1700 / 2000 [ 85%]  (Sampling) 
+    ## Chain 1 Iteration: 1800 / 2000 [ 90%]  (Sampling) 
+    ## Chain 1 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
     ## Chain 2 Iteration:    1 / 2000 [  0%]  (Warmup) 
     ## Chain 2 Iteration:  100 / 2000 [  5%]  (Warmup) 
     ## Chain 2 Iteration:  200 / 2000 [ 10%]  (Warmup) 
@@ -401,6 +317,12 @@ fit2 <- m2$sample(data=dat, chains=4, parallel_chains=getOption("mc.core",4))
     ## Chain 2 Iteration: 1100 / 2000 [ 55%]  (Sampling) 
     ## Chain 2 Iteration: 1200 / 2000 [ 60%]  (Sampling) 
     ## Chain 2 Iteration: 1300 / 2000 [ 65%]  (Sampling) 
+    ## Chain 2 Iteration: 1400 / 2000 [ 70%]  (Sampling) 
+    ## Chain 2 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+    ## Chain 2 Iteration: 1600 / 2000 [ 80%]  (Sampling) 
+    ## Chain 2 Iteration: 1700 / 2000 [ 85%]  (Sampling) 
+    ## Chain 2 Iteration: 1800 / 2000 [ 90%]  (Sampling) 
+    ## Chain 2 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
     ## Chain 3 Iteration:    1 / 2000 [  0%]  (Warmup) 
     ## Chain 3 Iteration:  100 / 2000 [  5%]  (Warmup) 
     ## Chain 3 Iteration:  200 / 2000 [ 10%]  (Warmup) 
@@ -418,6 +340,10 @@ fit2 <- m2$sample(data=dat, chains=4, parallel_chains=getOption("mc.core",4))
     ## Chain 3 Iteration: 1300 / 2000 [ 65%]  (Sampling) 
     ## Chain 3 Iteration: 1400 / 2000 [ 70%]  (Sampling) 
     ## Chain 3 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
+    ## Chain 3 Iteration: 1600 / 2000 [ 80%]  (Sampling) 
+    ## Chain 3 Iteration: 1700 / 2000 [ 85%]  (Sampling) 
+    ## Chain 3 Iteration: 1800 / 2000 [ 90%]  (Sampling) 
+    ## Chain 3 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
     ## Chain 4 Iteration:    1 / 2000 [  0%]  (Warmup) 
     ## Chain 4 Iteration:  100 / 2000 [  5%]  (Warmup) 
     ## Chain 4 Iteration:  200 / 2000 [ 10%]  (Warmup) 
@@ -435,39 +361,22 @@ fit2 <- m2$sample(data=dat, chains=4, parallel_chains=getOption("mc.core",4))
     ## Chain 4 Iteration: 1300 / 2000 [ 65%]  (Sampling) 
     ## Chain 4 Iteration: 1400 / 2000 [ 70%]  (Sampling) 
     ## Chain 4 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-    ## Chain 1 Iteration: 1300 / 2000 [ 65%]  (Sampling) 
-    ## Chain 1 Iteration: 1400 / 2000 [ 70%]  (Sampling) 
-    ## Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-    ## Chain 1 Iteration: 1600 / 2000 [ 80%]  (Sampling) 
-    ## Chain 1 Iteration: 1700 / 2000 [ 85%]  (Sampling) 
-    ## Chain 1 Iteration: 1800 / 2000 [ 90%]  (Sampling) 
-    ## Chain 1 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
-    ## Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
-    ## Chain 2 Iteration: 1400 / 2000 [ 70%]  (Sampling) 
-    ## Chain 2 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
-    ## Chain 2 Iteration: 1600 / 2000 [ 80%]  (Sampling) 
-    ## Chain 2 Iteration: 1700 / 2000 [ 85%]  (Sampling) 
-    ## Chain 2 Iteration: 1800 / 2000 [ 90%]  (Sampling) 
-    ## Chain 2 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
-    ## Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
-    ## Chain 3 Iteration: 1600 / 2000 [ 80%]  (Sampling) 
-    ## Chain 3 Iteration: 1700 / 2000 [ 85%]  (Sampling) 
-    ## Chain 3 Iteration: 1800 / 2000 [ 90%]  (Sampling) 
-    ## Chain 3 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
-    ## Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
     ## Chain 4 Iteration: 1600 / 2000 [ 80%]  (Sampling) 
     ## Chain 4 Iteration: 1700 / 2000 [ 85%]  (Sampling) 
     ## Chain 4 Iteration: 1800 / 2000 [ 90%]  (Sampling) 
     ## Chain 4 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
-    ## Chain 4 Iteration: 2000 / 2000 [100%]  (Sampling) 
+    ## Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
     ## Chain 1 finished in 0.2 seconds.
+    ## Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
     ## Chain 2 finished in 0.2 seconds.
+    ## Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
     ## Chain 3 finished in 0.2 seconds.
+    ## Chain 4 Iteration: 2000 / 2000 [100%]  (Sampling) 
     ## Chain 4 finished in 0.2 seconds.
     ## 
     ## All 4 chains finished successfully.
     ## Mean chain execution time: 0.2 seconds.
-    ## Total execution time: 0.5 seconds.
+    ## Total execution time: 0.3 seconds.
 
 ``` r
 summary2 <- as.data.frame(fit2$summary(c("a")))
@@ -475,43 +384,43 @@ summary2
 ```
 
     ##    variable       mean    median        sd       mad        q5         q95
-    ## 1    a[1,1] -1.0318888 -1.019340 0.3491648 0.3401729 -1.616479 -0.47920140
-    ## 2    a[2,1] -1.0067338 -1.000480 0.2468908 0.2463562 -1.416386 -0.60614280
-    ## 3    a[1,2] -1.7629349 -1.758740 0.2491066 0.2554372 -2.181881 -1.37163300
-    ## 4    a[2,2] -1.1241903 -1.120390 0.1833015 0.1751840 -1.429361 -0.82704005
-    ## 5    a[1,3] -1.4190989 -1.413185 0.1944941 0.1930716 -1.745942 -1.10150850
-    ## 6    a[2,3] -1.7748782 -1.770585 0.1837853 0.1823227 -2.083716 -1.47697250
-    ## 7    a[1,4] -1.2542467 -1.251210 0.2603387 0.2542733 -1.697124 -0.82507120
-    ## 8    a[2,4] -1.9947056 -1.984400 0.2847514 0.2827541 -2.479909 -1.55091050
-    ## 9    a[1,5] -2.0544470 -2.054780 0.1952149 0.1960887 -2.385671 -1.73965100
-    ## 10   a[2,5] -1.4566127 -1.456470 0.1632358 0.1580822 -1.727372 -1.18958400
-    ## 11   a[1,6] -1.1710119 -1.158510 0.3703212 0.3695106 -1.797788 -0.58438115
-    ## 12   a[2,6] -1.4206399 -1.417530 0.2089797 0.2058590 -1.764784 -1.07951800
-    ## 13   a[1,7] -1.0674428 -1.053595 0.6888958 0.7009206 -2.235340  0.01309245
-    ## 14   a[2,7] -0.9843234 -0.979276 0.2736796 0.2700237 -1.446478 -0.54092475
-    ## 15   a[1,8] -2.0288207 -2.024745 0.1538103 0.1552430 -2.289163 -1.78179250
-    ## 16   a[2,8] -1.7029848 -1.699885 0.1385540 0.1375037 -1.938184 -1.47945750
-    ## 17   a[1,9] -1.2970538 -1.285795 0.3032841 0.2985141 -1.814128 -0.81918850
-    ## 18   a[2,9] -1.6538289 -1.650090 0.1998184 0.1929382 -1.990870 -1.32737800
-    ##         rhat  ess_bulk ess_tail
-    ## 1  0.9996158  8922.107 3121.354
-    ## 2  1.0022319  9143.310 2595.874
-    ## 3  1.0009365  9223.277 3205.332
-    ## 4  1.0030022  8561.112 2743.666
-    ## 5  1.0002844 10782.438 2821.761
-    ## 6  1.0040041  9569.205 2834.028
-    ## 7  1.0064451  9517.080 3053.873
-    ## 8  1.0009983  7835.767 3178.055
-    ## 9  1.0016854 10018.065 2695.997
-    ## 10 1.0049750  7674.048 2608.519
-    ## 11 1.0006224  9681.339 2994.107
-    ## 12 1.0010372  9722.438 2846.475
-    ## 13 1.0004130  7832.386 2941.720
-    ## 14 1.0022162  9715.811 2947.715
-    ## 15 1.0016485  9617.171 2563.307
-    ## 16 1.0013999 10165.144 2891.384
-    ## 17 1.0008857  8730.750 2926.024
-    ## 18 0.9993869 10450.182 2773.382
+    ## 1    a[1,1] -1.0316659 -1.020350 0.3494212 0.3467431 -1.622262 -0.46612805
+    ## 2    a[2,1] -1.0061001 -1.000400 0.2492929 0.2504252 -1.428903 -0.60401050
+    ## 3    a[1,2] -1.7664804 -1.758030 0.2517803 0.2416045 -2.193102 -1.35139450
+    ## 4    a[2,2] -1.1229653 -1.118305 0.1786775 0.1779261 -1.421050 -0.83119940
+    ## 5    a[1,3] -1.4217936 -1.418790 0.1980376 0.1962295 -1.756216 -1.09823650
+    ## 6    a[2,3] -1.7711243 -1.766900 0.1865216 0.1858810 -2.088881 -1.46285450
+    ## 7    a[1,4] -1.2576829 -1.253935 0.2606089 0.2548886 -1.701006 -0.83760960
+    ## 8    a[2,4] -1.9950824 -1.985975 0.2919489 0.2735545 -2.487731 -1.51970950
+    ## 9    a[1,5] -2.0507941 -2.045525 0.1965641 0.2005810 -2.383352 -1.73431750
+    ## 10   a[2,5] -1.4552574 -1.448810 0.1630117 0.1606842 -1.729508 -1.18746650
+    ## 11   a[1,6] -1.1579936 -1.146170 0.3679092 0.3634149 -1.789996 -0.57294240
+    ## 12   a[2,6] -1.4141175 -1.407895 0.2118639 0.2040132 -1.767053 -1.06916450
+    ## 13   a[1,7] -1.0762263 -1.058125 0.7210566 0.7004966 -2.317597  0.05845763
+    ## 14   a[2,7] -0.9804392 -0.974199 0.2690100 0.2604053 -1.446774 -0.54061435
+    ## 15   a[1,8] -2.0299325 -2.026155 0.1507038 0.1507359 -2.282580 -1.78894000
+    ## 16   a[2,8] -1.7068723 -1.703515 0.1340669 0.1343236 -1.931715 -1.49343800
+    ## 17   a[1,9] -1.2964519 -1.285850 0.2990281 0.2953784 -1.816750 -0.82563330
+    ## 18   a[2,9] -1.6503921 -1.646515 0.1925697 0.1971858 -1.970892 -1.33677350
+    ##        rhat  ess_bulk ess_tail
+    ## 1  1.002015 10167.189 2861.886
+    ## 2  1.004247 10110.463 2270.349
+    ## 3  1.001044  9256.190 2650.980
+    ## 4  1.000900 10411.187 3037.640
+    ## 5  1.003262  9701.226 3035.056
+    ## 6  1.001334 10199.118 3028.152
+    ## 7  1.001237 10005.520 3134.307
+    ## 8  1.000767  9605.012 3333.710
+    ## 9  1.000336  9771.394 2685.097
+    ## 10 1.000971 11260.141 2983.848
+    ## 11 1.003040 10447.924 2695.887
+    ## 12 1.002134  8910.163 3200.873
+    ## 13 1.003549  8985.052 2734.266
+    ## 14 1.002260  9614.207 2965.040
+    ## 15 1.003754  8916.692 3021.300
+    ## 16 1.001616 10741.370 3135.184
+    ## 17 1.000877  9390.292 3200.797
+    ## 18 1.002338 10705.818 2918.587
 
 ``` r
 draws2 <- fit2$draws()
@@ -526,7 +435,7 @@ can safely move forward
 bayesplot:: mcmc_trace(draws2, regex_pars = c("a"))
 ```
 
-![](NWOGrants_files/figure-gfm/unnamed-chunk-13-1.png)<!-- -->
+![](NWOGrants_files/figure-gfm/unnamed-chunk-14-1.png)<!-- -->
 
 ### Model sampling
 
@@ -559,7 +468,7 @@ for(i in 1:9){
 }
 ```
 
-![](NWOGrants_files/figure-gfm/unnamed-chunk-15-1.png)<!-- -->
+![](NWOGrants_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
 
 In addition to the contrast figure, we want to compare our model’s
 posterior prediction with the input data. There are a large room to
@@ -606,7 +515,7 @@ for(i in 1:9){text(x=2*i-0.5,y=mean(c(dat$A[2*i-1]/dat$N[2*i-1],dat$A[2*i]/dat$N
                    labels = concat("disc ",dat$D[2*i]), font=1)}
 ```
 
-![](NWOGrants_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+![](NWOGrants_files/figure-gfm/unnamed-chunk-19-1.png)<!-- -->
 
 ## Partial pooling statistical model
 
@@ -617,14 +526,7 @@ constructed by the three new parameters which are estimated from the
 data. Another noteworthy point is that we are using a non-centered
 parameterization to improve the sampling process of the MCMC
 
-$$
-A \\sim Bin(N,p)\\\\
-logit(p) = a\_{G,D}\\\\
-a = \\bar{a} + z\*\\sigma\\\\
-\\bar{a} \\sim N(0,1.5)\\\\
-\\sigma \\sim Exp(1.5)\\\\
-z \\sim N(0,1)
-$$
+![](https://github.com/SteveVu2212/Bayes_analysis_for_grant_funding_bias/blob/main/pictures/model_3.png)
 
 ### Model fitting
 
@@ -642,6 +544,13 @@ fit3 <- m3$sample(data=dat, chains=4, parallel_chains=getOption('mc.core',4))
     ## Chain 1 Iteration:  400 / 2000 [ 20%]  (Warmup) 
     ## Chain 1 Iteration:  500 / 2000 [ 25%]  (Warmup) 
     ## Chain 1 Iteration:  600 / 2000 [ 30%]  (Warmup) 
+    ## Chain 1 Iteration:  700 / 2000 [ 35%]  (Warmup) 
+    ## Chain 1 Iteration:  800 / 2000 [ 40%]  (Warmup) 
+    ## Chain 1 Iteration:  900 / 2000 [ 45%]  (Warmup) 
+    ## Chain 1 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+    ## Chain 1 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+    ## Chain 1 Iteration: 1100 / 2000 [ 55%]  (Sampling) 
+    ## Chain 1 Iteration: 1200 / 2000 [ 60%]  (Sampling) 
     ## Chain 2 Iteration:    1 / 2000 [  0%]  (Warmup) 
     ## Chain 2 Iteration:  100 / 2000 [  5%]  (Warmup) 
     ## Chain 2 Iteration:  200 / 2000 [ 10%]  (Warmup) 
@@ -650,6 +559,12 @@ fit3 <- m3$sample(data=dat, chains=4, parallel_chains=getOption('mc.core',4))
     ## Chain 2 Iteration:  500 / 2000 [ 25%]  (Warmup) 
     ## Chain 2 Iteration:  600 / 2000 [ 30%]  (Warmup) 
     ## Chain 2 Iteration:  700 / 2000 [ 35%]  (Warmup) 
+    ## Chain 2 Iteration:  800 / 2000 [ 40%]  (Warmup) 
+    ## Chain 2 Iteration:  900 / 2000 [ 45%]  (Warmup) 
+    ## Chain 2 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
+    ## Chain 2 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+    ## Chain 2 Iteration: 1100 / 2000 [ 55%]  (Sampling) 
+    ## Chain 2 Iteration: 1200 / 2000 [ 60%]  (Sampling) 
     ## Chain 3 Iteration:    1 / 2000 [  0%]  (Warmup) 
     ## Chain 3 Iteration:  100 / 2000 [  5%]  (Warmup) 
     ## Chain 3 Iteration:  200 / 2000 [ 10%]  (Warmup) 
@@ -662,6 +577,9 @@ fit3 <- m3$sample(data=dat, chains=4, parallel_chains=getOption('mc.core',4))
     ## Chain 3 Iteration:  900 / 2000 [ 45%]  (Warmup) 
     ## Chain 3 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
     ## Chain 3 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
+    ## Chain 3 Iteration: 1100 / 2000 [ 55%]  (Sampling) 
+    ## Chain 3 Iteration: 1200 / 2000 [ 60%]  (Sampling) 
+    ## Chain 3 Iteration: 1300 / 2000 [ 65%]  (Sampling) 
     ## Chain 4 Iteration:    1 / 2000 [  0%]  (Warmup) 
     ## Chain 4 Iteration:  100 / 2000 [  5%]  (Warmup) 
     ## Chain 4 Iteration:  200 / 2000 [ 10%]  (Warmup) 
@@ -674,38 +592,30 @@ fit3 <- m3$sample(data=dat, chains=4, parallel_chains=getOption('mc.core',4))
     ## Chain 4 Iteration:  900 / 2000 [ 45%]  (Warmup) 
     ## Chain 4 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
     ## Chain 4 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
-    ## Chain 1 Iteration:  700 / 2000 [ 35%]  (Warmup) 
-    ## Chain 1 Iteration:  800 / 2000 [ 40%]  (Warmup) 
-    ## Chain 1 Iteration:  900 / 2000 [ 45%]  (Warmup) 
-    ## Chain 1 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
-    ## Chain 1 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
-    ## Chain 1 Iteration: 1100 / 2000 [ 55%]  (Sampling) 
-    ## Chain 1 Iteration: 1200 / 2000 [ 60%]  (Sampling) 
+    ## Chain 4 Iteration: 1100 / 2000 [ 55%]  (Sampling) 
     ## Chain 1 Iteration: 1300 / 2000 [ 65%]  (Sampling) 
     ## Chain 1 Iteration: 1400 / 2000 [ 70%]  (Sampling) 
     ## Chain 1 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
     ## Chain 1 Iteration: 1600 / 2000 [ 80%]  (Sampling) 
     ## Chain 1 Iteration: 1700 / 2000 [ 85%]  (Sampling) 
-    ## Chain 2 Iteration:  800 / 2000 [ 40%]  (Warmup) 
-    ## Chain 2 Iteration:  900 / 2000 [ 45%]  (Warmup) 
-    ## Chain 2 Iteration: 1000 / 2000 [ 50%]  (Warmup) 
-    ## Chain 2 Iteration: 1001 / 2000 [ 50%]  (Sampling) 
-    ## Chain 2 Iteration: 1100 / 2000 [ 55%]  (Sampling) 
-    ## Chain 2 Iteration: 1200 / 2000 [ 60%]  (Sampling) 
+    ## Chain 1 Iteration: 1800 / 2000 [ 90%]  (Sampling) 
+    ## Chain 1 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
+    ## Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
     ## Chain 2 Iteration: 1300 / 2000 [ 65%]  (Sampling) 
     ## Chain 2 Iteration: 1400 / 2000 [ 70%]  (Sampling) 
     ## Chain 2 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
     ## Chain 2 Iteration: 1600 / 2000 [ 80%]  (Sampling) 
     ## Chain 2 Iteration: 1700 / 2000 [ 85%]  (Sampling) 
-    ## Chain 3 Iteration: 1100 / 2000 [ 55%]  (Sampling) 
-    ## Chain 3 Iteration: 1200 / 2000 [ 60%]  (Sampling) 
-    ## Chain 3 Iteration: 1300 / 2000 [ 65%]  (Sampling) 
+    ## Chain 2 Iteration: 1800 / 2000 [ 90%]  (Sampling) 
+    ## Chain 2 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
+    ## Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
     ## Chain 3 Iteration: 1400 / 2000 [ 70%]  (Sampling) 
     ## Chain 3 Iteration: 1500 / 2000 [ 75%]  (Sampling) 
     ## Chain 3 Iteration: 1600 / 2000 [ 80%]  (Sampling) 
     ## Chain 3 Iteration: 1700 / 2000 [ 85%]  (Sampling) 
     ## Chain 3 Iteration: 1800 / 2000 [ 90%]  (Sampling) 
-    ## Chain 4 Iteration: 1100 / 2000 [ 55%]  (Sampling) 
+    ## Chain 3 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
+    ## Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
     ## Chain 4 Iteration: 1200 / 2000 [ 60%]  (Sampling) 
     ## Chain 4 Iteration: 1300 / 2000 [ 65%]  (Sampling) 
     ## Chain 4 Iteration: 1400 / 2000 [ 70%]  (Sampling) 
@@ -713,24 +623,16 @@ fit3 <- m3$sample(data=dat, chains=4, parallel_chains=getOption('mc.core',4))
     ## Chain 4 Iteration: 1600 / 2000 [ 80%]  (Sampling) 
     ## Chain 4 Iteration: 1700 / 2000 [ 85%]  (Sampling) 
     ## Chain 4 Iteration: 1800 / 2000 [ 90%]  (Sampling) 
-    ## Chain 1 Iteration: 1800 / 2000 [ 90%]  (Sampling) 
-    ## Chain 1 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
-    ## Chain 1 Iteration: 2000 / 2000 [100%]  (Sampling) 
-    ## Chain 2 Iteration: 1800 / 2000 [ 90%]  (Sampling) 
-    ## Chain 2 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
-    ## Chain 2 Iteration: 2000 / 2000 [100%]  (Sampling) 
-    ## Chain 3 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
-    ## Chain 3 Iteration: 2000 / 2000 [100%]  (Sampling) 
-    ## Chain 4 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
-    ## Chain 4 Iteration: 2000 / 2000 [100%]  (Sampling) 
     ## Chain 1 finished in 0.3 seconds.
     ## Chain 2 finished in 0.3 seconds.
     ## Chain 3 finished in 0.3 seconds.
+    ## Chain 4 Iteration: 1900 / 2000 [ 95%]  (Sampling) 
+    ## Chain 4 Iteration: 2000 / 2000 [100%]  (Sampling) 
     ## Chain 4 finished in 0.3 seconds.
     ## 
     ## All 4 chains finished successfully.
     ## Mean chain execution time: 0.3 seconds.
-    ## Total execution time: 0.6 seconds.
+    ## Total execution time: 0.5 seconds.
 
 ``` r
 summary3 <- as.data.frame(fit3$summary(c("a", "a_bar", "sigma")))
@@ -738,47 +640,47 @@ summary3
 ```
 
     ##    variable       mean     median         sd        mad         q5        q95
-    ## 1    a[1,1] -1.3791858 -1.3893600 0.24716631 0.24395442 -1.7627950 -0.9538935
-    ## 2    a[2,1] -1.2734558 -1.2823300 0.21309078 0.21734175 -1.6137675 -0.9150656
-    ## 3    a[1,2] -1.6915724 -1.6831050 0.19408098 0.19289367 -2.0221790 -1.3910625
-    ## 4    a[2,2] -1.2755676 -1.2774700 0.17623120 0.18066222 -1.5570155 -0.9772376
-    ## 5    a[1,3] -1.4807130 -1.4828750 0.16386568 0.16202594 -1.7513880 -1.2144085
-    ## 6    a[2,3] -1.7154071 -1.7104250 0.15329599 0.15175152 -1.9700625 -1.4701530
-    ## 7    a[1,4] -1.4202226 -1.4243200 0.21641154 0.21073676 -1.7701755 -1.0599255
-    ## 8    a[2,4] -1.7956579 -1.7844550 0.21661484 0.21027716 -2.1700900 -1.4558805
-    ## 9    a[1,5] -1.9085078 -1.9037300 0.16697685 0.16671096 -2.1920235 -1.6431900
-    ## 10   a[2,5] -1.4929781 -1.4933150 0.14659615 0.14290781 -1.7351340 -1.2502015
-    ## 11   a[1,6] -1.4375677 -1.4440100 0.24335627 0.23405806 -1.8293310 -1.0348360
-    ## 12   a[2,6] -1.4836728 -1.4855250 0.17861461 0.17748946 -1.7730525 -1.1899100
-    ## 13   a[1,7] -1.5162112 -1.5205400 0.29499517 0.27248705 -1.9874555 -1.0261650
-    ## 14   a[2,7] -1.2882498 -1.2914500 0.22161500 0.22004749 -1.6418360 -0.9156909
-    ## 15   a[1,8] -1.9248068 -1.9230800 0.14156747 0.14476106 -2.1588525 -1.7000995
-    ## 16   a[2,8] -1.6831270 -1.6802450 0.12290640 0.12449392 -1.8914265 -1.4887205
-    ## 17   a[1,9] -1.4567299 -1.4606250 0.22036804 0.21359818 -1.8180270 -1.0947500
-    ## 18   a[2,9] -1.6374329 -1.6313150 0.15770613 0.15788949 -1.9114605 -1.3928860
-    ## 19    a_bar -1.5468434 -1.5506550 0.09606641 0.09421923 -1.6993220 -1.3870860
-    ## 20    sigma  0.2901436  0.2821555 0.09214954 0.08634292  0.1571163  0.4534498
+    ## 1    a[1,1] -1.3822406 -1.3904100 0.23963174 0.23510330 -1.7568405 -0.9559859
+    ## 2    a[2,1] -1.2742809 -1.2812500 0.21609207 0.22024023 -1.6174665 -0.9126825
+    ## 3    a[1,2] -1.6891388 -1.6826750 0.19196981 0.18582167 -2.0151825 -1.3949295
+    ## 4    a[2,2] -1.2800723 -1.2817200 0.17520694 0.17414620 -1.5688550 -0.9948421
+    ## 5    a[1,3] -1.4770765 -1.4751500 0.16137163 0.15969826 -1.7370805 -1.2145065
+    ## 6    a[2,3] -1.7172656 -1.7100050 0.16000521 0.15780053 -1.9933515 -1.4653710
+    ## 7    a[1,4] -1.4191426 -1.4174500 0.20963749 0.20608881 -1.7664885 -1.0758995
+    ## 8    a[2,4] -1.7928931 -1.7838450 0.21298989 0.19739336 -2.1664455 -1.4672770
+    ## 9    a[1,5] -1.9064354 -1.8968700 0.17035007 0.17218916 -2.1988770 -1.6458275
+    ## 10   a[2,5] -1.4957170 -1.4948450 0.14036772 0.13976470 -1.7266930 -1.2650015
+    ## 11   a[1,6] -1.4352638 -1.4413950 0.24142462 0.23057395 -1.8134405 -1.0226555
+    ## 12   a[2,6] -1.4808142 -1.4850600 0.17333626 0.17122547 -1.7636320 -1.1925110
+    ## 13   a[1,7] -1.5161194 -1.5332700 0.30020575 0.27127132 -1.9852935 -1.0016475
+    ## 14   a[2,7] -1.2919313 -1.3019200 0.22432404 0.22271617 -1.6476190 -0.9218428
+    ## 15   a[1,8] -1.9257899 -1.9228450 0.14182768 0.14189965 -2.1639875 -1.6949700
+    ## 16   a[2,8] -1.6826462 -1.6808900 0.12022947 0.11768879 -1.8878355 -1.4881095
+    ## 17   a[1,9] -1.4568480 -1.4637350 0.22175888 0.22487335 -1.8085910 -1.0812050
+    ## 18   a[2,9] -1.6328094 -1.6269150 0.16010496 0.15454622 -1.9045290 -1.3781925
+    ## 19    a_bar -1.5461427 -1.5489000 0.09482562 0.08897083 -1.6957120 -1.3873470
+    ## 20    sigma  0.2900326  0.2804705 0.09054575 0.08416201  0.1577216  0.4487851
     ##         rhat ess_bulk ess_tail
-    ## 1  1.0003834 3866.082 3111.393
-    ## 2  0.9995874 3913.222 2574.503
-    ## 3  1.0007349 5515.685 2896.675
-    ## 4  1.0024471 4830.935 3092.994
-    ## 5  1.0007721 5453.594 3104.364
-    ## 6  1.0007930 6429.163 3263.984
-    ## 7  1.0002538 5143.901 3127.420
-    ## 8  1.0016198 4497.779 3039.633
-    ## 9  1.0002363 5252.287 3191.788
-    ## 10 0.9994817 6056.517 3490.044
-    ## 11 1.0005989 4264.984 2907.529
-    ## 12 1.0004858 5788.881 3186.489
-    ## 13 0.9999359 3648.533 3181.999
-    ## 14 1.0004318 4286.367 2808.209
-    ## 15 1.0007123 4206.377 3238.662
-    ## 16 0.9999304 6540.303 3489.146
-    ## 17 1.0002822 5383.880 3211.846
-    ## 18 1.0003961 5180.744 3426.167
-    ## 19 1.0010213 1833.257 2134.471
-    ## 20 1.0032534 1292.255 1849.858
+    ## 1  1.0014077 4675.568 3322.991
+    ## 2  1.0004083 4010.488 2710.819
+    ## 3  1.0004901 6022.944 3034.982
+    ## 4  1.0013645 4198.650 2731.357
+    ## 5  1.0006669 5722.629 3643.205
+    ## 6  1.0010809 5859.182 3193.757
+    ## 7  1.0026703 5130.209 3541.258
+    ## 8  1.0008814 4901.463 2698.687
+    ## 9  0.9997703 4713.969 2933.219
+    ## 10 1.0000243 6327.029 3452.504
+    ## 11 1.0003192 4668.250 2963.967
+    ## 12 1.0000872 6230.134 3318.464
+    ## 13 1.0010141 4074.955 3194.391
+    ## 14 1.0007540 4251.107 2902.247
+    ## 15 1.0003025 4689.733 3137.406
+    ## 16 1.0017980 6851.197 3504.788
+    ## 17 1.0000324 5095.902 3267.803
+    ## 18 1.0010192 6093.714 3318.363
+    ## 19 1.0006543 1716.083 2092.229
+    ## 20 1.0023595 1563.185 1933.685
 
 ``` r
 draws3 <- fit3$draws()
@@ -794,7 +696,7 @@ sampling cross-validation (PSIS) later
 bayesplot::mcmc_trace(draws3, regex_pars = c("a"))
 ```
 
-![](NWOGrants_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+![](NWOGrants_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
 
 ### Model sampling
 
@@ -825,7 +727,7 @@ for(i in 1:9){
 }
 ```
 
-![](NWOGrants_files/figure-gfm/unnamed-chunk-23-1.png)<!-- -->
+![](NWOGrants_files/figure-gfm/unnamed-chunk-24-1.png)<!-- -->
 
 One more step, we can see that our estimates have improved much better
 and the percentile intervals have been shortened significantly. The
@@ -863,7 +765,7 @@ for(i in 1:9){text(x=2*i-0.5,y=mean(c(dat$A[2*i-1]/dat$N[2*i-1],dat$A[2*i]/dat$N
                    labels = concat("disc ",dat$D[2*i]), font=1)}
 ```
 
-![](NWOGrants_files/figure-gfm/unnamed-chunk-26-1.png)<!-- -->
+![](NWOGrants_files/figure-gfm/unnamed-chunk-27-1.png)<!-- -->
 
 # Model comparison
 
@@ -875,21 +777,9 @@ gender onto awards by using the sampling from the third model
 
 ``` r
 loo1 <- fit1$loo()
-```
-
-    ## Warning: Some Pareto k diagnostic values are slightly high. See help('pareto-k-diagnostic') for details.
-
-``` r
 loo2 <- fit2$loo()
-```
-
-    ## Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.
-
-``` r
 loo3 <- fit3$loo()
 ```
-
-    ## Warning: Some Pareto k diagnostic values are too high. See help('pareto-k-diagnostic') for details.
 
 ``` r
 loo_compare(loo1, loo2, loo3)
@@ -897,8 +787,8 @@ loo_compare(loo1, loo2, loo3)
 
     ##        elpd_diff se_diff
     ## model3  0.0       0.0   
-    ## model2 -2.2       2.1   
-    ## model1 -6.4       2.2
+    ## model2 -2.9       2.3   
+    ## model1 -6.6       2.4
 
 # Causal effects
 
@@ -945,7 +835,7 @@ dens( female_avg - male_avg , lwd=4 , col=2 , xlab="effect of gender" )
 abline(v=0,lty=3)
 ```
 
-![](NWOGrants_files/figure-gfm/unnamed-chunk-32-1.png)<!-- -->
+![](NWOGrants_files/figure-gfm/unnamed-chunk-33-1.png)<!-- -->
 
 ## Creating a pseudo-population
 
@@ -996,7 +886,7 @@ dens( p_g1 - p_g2 , lwd=4 , col=2 , xlab="effect of gender perception" )
 abline(v=0,lty=3)
 ```
 
-![](NWOGrants_files/figure-gfm/unnamed-chunk-37-1.png)<!-- -->
+![](NWOGrants_files/figure-gfm/unnamed-chunk-38-1.png)<!-- -->
 
 # References
 

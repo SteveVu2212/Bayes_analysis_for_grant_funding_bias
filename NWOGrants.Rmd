@@ -6,6 +6,14 @@ output: github_document
 # Installation
 
 ```{r}
+rm(list=ls())
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r}
 library(rethinking)
 library(cmdstanr)
 library(bayesplot)
